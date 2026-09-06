@@ -1,0 +1,47 @@
+# ============================================================
+# loadgen 服務 —— 這份是範本，另外三個服務照著改
+#
+# 一個 manifest 檔可以放多個資源，用 --- 分隔。
+# 每個服務都需要兩個：Deployment（生出 Pod）＋ Service（固定的名字）
+# ============================================================
+
+apiVersion: apps/v1          
+kind: Deployment             
+metadata:
+  name: loadgen              
+  labels:
+    app: loadgen             
+
+spec:                        
+  replicas: 1                
+
+  selector:
+    matchLabels:
+      app: loadgen           
+
+  template:                  
+    metadata:
+      labels:
+        app: loadgen         
+    spec:
+      containers:
+        - name: loadgen
+          image: loadgen:0.1
+
+          imagePullPolicy: IfNotPresent
+
+          env:               
+            - name: GATEWAY_URL
+              value: "http://gateway"
+            - name: RPS
+              value: "10"            # 每秒送幾筆請求
+            - name: MAX_CART
+              value: "12"            # 購物車最多幾件
+
+          resources:
+            requests:        
+              memory: 128Mi
+              cpu: 100m      
+            limits:          
+              memory: 512Mi  
+    

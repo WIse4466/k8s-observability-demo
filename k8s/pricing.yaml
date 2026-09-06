@@ -1,0 +1,69 @@
+# ============================================================
+# pricing 服務 —— 這份是範本，另外三個服務照著改
+#
+# 一個 manifest 檔可以放多個資源，用 --- 分隔。
+# 每個服務都需要兩個：Deployment（生出 Pod）＋ Service（固定的名字）
+# ============================================================
+
+apiVersion: apps/v1          # Deployment 屬於 apps 這組 API 的 v1 版
+kind: Deployment             # 資源類型：我要描述的是一個 Deployment
+metadata:
+  name: pricing              # 這個 Deployment 叫什麼
+  labels:
+    app: pricing             # 貼在 Deployment 自己身上的標籤
+
+spec:                        # ↓↓↓ 以下是「我要的狀態」 ↓↓↓
+  replicas: 1                # 這個程式要跑幾份。Day 11 會改成 2 做示範
+
+  selector:
+    matchLabels:
+      app: pricing           # ← 標籤 (1/3)：這個 Deployment 管哪些 Pod
+
+  template:                  # ↓ 生出來的 Pod 要長什麼樣
+    metadata:
+      labels:
+        app: pricing         # ← 標籤 (2/3)：貼在 Pod 上，必須跟上面 selector 一致
+    spec:
+      containers:
+        - name: pricing
+          image: pricing:0.1
+
+          # ⚠️ kind 的坑（Day 5 講過）：預設值會跑去 Docker Hub 找映像檔，
+          # 但我們的映像檔只存在本機。IfNotPresent = 本機有就別出去找。
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - name: http     # ⚠️ 這個名字很重要！Day 8 的 ServiceMonitor 要靠它
+              containerPort: 8000
+
+          env:               # 三個故障開關，先全部關閉
+            - name: BUG_SILENT_DISCOUNT
+              value: "false"
+            - name: LEAK_KB_PER_REQUEST
+              value: "0"
+            - name: DB_LATENCY_MS
+              value: "60"    # 模擬資料庫查詢，沒有它 Day 19 的 N+1 看不出長尾
+
+          resources:
+            requests:        # 排程時保留多少
+              memory: 128Mi
+              cpu: 100m      # m = milli，100m 是 0.1 顆 CPU
+            limits:          # 超過就砍掉
+              memory: 512Mi  # ⚠️ 故障三就是要撞這條線才會 OOMKilled
+
+---
+apiVersion: v1               # Service 是最核心的資源，所以是 v1 沒有前綴
+kind: Service
+metadata:
+  name: pricing              # ⚠️ 這個名字就是網址：http://pricing
+  labels:
+    app: pricing             # Day 8 的 ServiceMonitor 靠這個標籤找到它
+
+spec:
+  selector:
+    app: pricing             # ← 標籤 (3/3)：這個 Service 把流量送給哪些 Pod
+
+  ports:
+    - name: http             # ⚠️ 跟上面 containerPort 的名字一致
+      port: 80               # 別人打 pricing:80
+      targetPort: http       # 轉送到容器裡名為 http 的埠（也就是 8000）

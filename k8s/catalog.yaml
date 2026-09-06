@@ -1,0 +1,65 @@
+# ============================================================
+# catalog 服務
+#
+# 一個 manifest 檔可以放多個資源，用 --- 分隔。
+# 每個服務都需要兩個：Deployment（生出 Pod）＋ Service（固定的名字）
+# ============================================================
+
+apiVersion: apps/v1          
+kind: Deployment             
+metadata:
+  name: catalog              
+  labels:
+    app: catalog             
+
+spec:                        
+  replicas: 1                
+
+  selector:
+    matchLabels:
+      app: catalog           
+
+  template:                  
+    metadata:
+      labels:
+        app: catalog         
+    spec:
+      containers:
+        - name: catalog
+          image: catalog:0.1
+
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - name: http     
+              containerPort: 8000
+
+          env:               
+            - name: BUG_N_PLUS_ONE
+              value: "false"
+            - name: PRICING_URL
+              value: "http://pricing"
+
+          resources:
+            requests:        
+              memory: 128Mi
+              cpu: 100m      
+            limits:          
+              memory: 512Mi  
+
+---
+apiVersion: v1               # Service 
+kind: Service
+metadata:
+  name: catalog              
+  labels:
+    app: catalog             
+
+spec:
+  selector:
+    app: catalog             
+
+  ports:
+    - name: http             
+      port: 80               
+      targetPort: http       

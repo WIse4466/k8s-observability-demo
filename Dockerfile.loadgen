@@ -1,0 +1,7 @@
+# loadgen 不是網頁服務，是一支一直跑的程式，所以啟動指令不一樣
+FROM python:3.12-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY loadgen/ ./loadgen/
+CMD ["python", "loadgen/main.py"]

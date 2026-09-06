@@ -1,0 +1,63 @@
+# ============================================================
+# gateway 服務 —— 這份是範本，另外三個服務照著改
+#
+# 一個 manifest 檔可以放多個資源，用 --- 分隔。
+# 每個服務都需要兩個：Deployment（生出 Pod）＋ Service（固定的名字）
+# ============================================================
+
+apiVersion: apps/v1          
+kind: Deployment             
+metadata:
+  name: gateway              
+  labels:
+    app: gateway             
+
+spec:                        
+  replicas: 1                
+
+  selector:
+    matchLabels:
+      app: gateway           
+
+  template:                  
+    metadata:
+      labels:
+        app: gateway         
+    spec:
+      containers:
+        - name: gateway
+          image: gateway:0.1
+
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - name: http     
+              containerPort: 8000
+
+          env:               
+            - name: CATALOG_URL
+              value: "http://catalog"
+
+          resources:
+            requests:        
+              memory: 128Mi
+              cpu: 100m      
+            limits:          
+              memory: 512Mi  
+
+---
+apiVersion: v1               # Service
+kind: Service
+metadata:
+  name: gateway              
+  labels:
+    app: gateway             
+
+spec:
+  selector:
+    app: gateway             
+
+  ports:
+    - name: http             
+      port: 80               
+      targetPort: http       

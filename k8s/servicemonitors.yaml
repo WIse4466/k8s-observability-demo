@@ -1,0 +1,44 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: gateway
+  labels:
+    release: kps
+spec:
+  selector:
+    matchLabels:
+      app: gateway
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: pricing
+  labels:
+    release: kps
+spec:
+  selector:
+    matchLabels:
+      app: pricing
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: catalog
+  labels:
+    release: kps
+spec:
+  selector:
+    matchLabels:
+      app: catalog
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
