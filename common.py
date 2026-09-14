@@ -5,9 +5,25 @@
 import logging, os, sys, time
 import structlog
 from fastapi import Response
+from opentelemetry import trace
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 
 SERVICE = os.getenv("SERVICE_NAME", "unknown")
+
+# --- 追蹤（Day 19）------------------------------------------------------
+# 手動埋點用的 tracer。沒跑在 opentelemetry-instrument 底下時它是 no-op，不會壞
+tracer = trace.get_tracer(SERVICE)
+
+
+def add_trace_context(logger, method_name, event_dict):
+    """structlog 處理器：把當下 span 的 trace_id / span_id 塞進每一行 log。
+    這是 log 跟 trace 之間唯一的關聯欄位——Day 14 預留、Day 19 填上。"""
+    ctx = trace.get_current_span().get_span_context()
+    if ctx.is_valid:
+        event_dict["trace_id"] = format(ctx.trace_id, "032x")
+        event_dict["span_id"] = format(ctx.span_id, "016x")
+    return event_dict
+
 
 # --- 結構化日誌（Day 14）------------------------------------------------
 def setup_logging():
@@ -16,6 +32,7 @@ def setup_logging():
         processors=[
             structlog.processors.add_log_level,
             structlog.processors.TimeStamper(fmt="iso"),
+            add_trace_context,                 # Day 19：每一行都帶 trace_id
             structlog.processors.JSONRenderer(ensure_ascii=False),
         ],
     )

@@ -26,7 +26,7 @@ spec:
     spec:
       containers:
         - name: gateway
-          image: gateway:0.1
+          image: gateway:0.2   # Day 19：加了 OTel 的版本
 
           imagePullPolicy: IfNotPresent
 
@@ -35,6 +35,8 @@ spec:
               containerPort: 8000
 
           env:               
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT   # Day 19：trace 送去 Collector
+              value: "http://otel-collector.monitoring.svc.cluster.local:4317"
             - name: CATALOG_URL
               value: "http://catalog"
 

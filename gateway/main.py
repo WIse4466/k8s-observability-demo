@@ -4,6 +4,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import httpx
 from fastapi import FastAPI
+from opentelemetry import trace
 from pydantic import BaseModel
 from common import setup_logging, instrument, checkout_total
 
@@ -30,6 +31,10 @@ async def checkout(cart: Cart):
         return {"error": "checkout failed"}
 
     total = round(sum(i["price"] for i in priced), 2)
+    # Day 19 手動埋點：業務資料掛到 span 上，trace 的屬性可以放高基數的值
+    span = trace.get_current_span()
+    span.set_attribute("cart.item_count", len(priced))
+    span.set_attribute("checkout.total", total)
     checkout_total.labels("success").inc()
     log.info("checkout priced", item_count=len(priced), total=total)
     return {"total": total, "item_count": len(priced), "items": priced}

@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from fastapi import FastAPI
 from pydantic import BaseModel
-from common import setup_logging, instrument, discount_missing_total
+from common import setup_logging, instrument, discount_missing_total, tracer
 
 BUG_SILENT_DISCOUNT = os.getenv("BUG_SILENT_DISCOUNT", "false").lower() == "true"
 LEAK_KB_PER_REQUEST = int(os.getenv("LEAK_KB_PER_REQUEST", "0"))
@@ -53,13 +53,21 @@ def _price_one_nodb(product_id: str) -> dict:
     _maybe_leak()
     base = BASE_PRICE.get(product_id, 100)
     category = category_of(product_id)
-    try:
-        discount = RULES[product_id]
-    except KeyError:
-        # ↓↓↓ 故障一：接住例外、記一行 WARN、回傳 0 折扣繼續跑 ↓↓↓
-        log.warning("discount rule not found", product_id=product_id, category=category)
-        discount_missing_total.labels(category).inc()
-        discount = 0
+    # Day 19 手動埋點：自動埋點只看得到 HTTP，「算一件商品的價格」這步要自己開 span
+    with tracer.start_as_current_span("price_one") as span:
+        span.set_attribute("product.id", product_id)
+        span.set_attribute("product.category", category)
+        try:
+            discount = RULES[product_id]
+            span.set_attribute("discount.rule_found", True)
+        except KeyError:
+            # ↓↓↓ 故障一：接住例外、記一行 WARN、回傳 0 折扣繼續跑 ↓↓↓
+            log.warning("discount rule not found", product_id=product_id, category=category)
+            discount_missing_total.labels(category).inc()
+            discount = 0
+            # 這兩個屬性讓故障一從 trace 也查得到：{ span.discount.rule_found = false }
+            span.set_attribute("discount.rule_found", False)
+        span.set_attribute("discount.applied", discount)
     return {"product_id": product_id, "category": category,
             "price": round(base * (1 - discount), 2), "discount": discount}
 

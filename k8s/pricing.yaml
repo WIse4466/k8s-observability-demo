@@ -26,7 +26,7 @@ spec:                        # ↓↓↓ 以下是「我要的狀態」 ↓↓�
     spec:
       containers:
         - name: pricing
-          image: pricing:0.1
+          image: pricing:0.2   # Day 19：加了 OTel 的版本
 
           # ⚠️ kind 的坑（Day 5 講過）：預設值會跑去 Docker Hub 找映像檔，
           # 但我們的映像檔只存在本機。IfNotPresent = 本機有就別出去找。
@@ -37,6 +37,8 @@ spec:                        # ↓↓↓ 以下是「我要的狀態」 ↓↓�
               containerPort: 8000
 
           env:               # 三個故障開關，先全部關閉
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT   # Day 19：trace 送去 Collector
+              value: "http://otel-collector.monitoring.svc.cluster.local:4317"
             - name: BUG_SILENT_DISCOUNT
               value: "false"
             - name: LEAK_KB_PER_REQUEST

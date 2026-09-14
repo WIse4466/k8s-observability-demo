@@ -3,3 +3,9 @@ uvicorn[standard]==0.41.0
 httpx==0.28.1
 structlog==25.5.0
 prometheus-client==0.24.1
+
+# --- 追蹤（Day 19）---
+opentelemetry-distro==0.65b0                   # SDK + api + opentelemetry-instrument 指令
+opentelemetry-exporter-otlp==1.44.0            # 把 span 用 OTLP 送給 Collector
+opentelemetry-instrumentation-fastapi==0.65b0  # 自動埋點：收到的請求
+opentelemetry-instrumentation-httpx==0.65b0    # 自動埋點：送出的請求（含 traceparent 標頭）
