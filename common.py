@@ -9,7 +9,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_
 
 SERVICE = os.getenv("SERVICE_NAME", "unknown")
 
-# --- 結構化日誌（Day 13）------------------------------------------------
+# --- 結構化日誌（Day 14）------------------------------------------------
 def setup_logging():
     logging.basicConfig(format="%(message)s", stream=sys.stdout, level=logging.INFO)
     structlog.configure(
@@ -22,13 +22,13 @@ def setup_logging():
     return structlog.get_logger(service=SERVICE)
 
 
-# --- 指標（Day 8 / Day 12）----------------------------------------------
+# --- 指標（Day 8 / Day 13）----------------------------------------------
 requests_total = Counter(
     "http_requests_total", "HTTP 請求數", ["service", "path", "status"],
 )
 request_duration = Histogram(
     "http_request_duration_seconds", "HTTP 請求耗時", ["service", "path"],
-    # 桶圍繞延遲 SLO 300ms 設，兩側都留刻度（Day 12）
+    # 桶圍繞延遲 SLO 300ms 設，兩側都留刻度（Day 13）
     buckets=[0.01, 0.05, 0.1, 0.2, 0.3, 0.5, 1.0, 2.0, 5.0],
 )
 checkout_total = Counter("checkout_total", "結帳請求數", ["status"])

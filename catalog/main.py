@@ -1,7 +1,7 @@
 """catalog — 查商品資料（倉庫）。
 
 埋了一個故障：
-  BUG_N_PLUS_ONE  故障二：購物車超過 5 件時，改成逐一呼叫 pricing（Day 19 由 trace 查出）
+  BUG_N_PLUS_ONE  故障二：購物車超過 5 件時，改成逐一呼叫 pricing（Day 20 由 trace 查出）
 """
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

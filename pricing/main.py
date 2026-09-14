@@ -1,8 +1,8 @@
 """pricing — 算價格與折扣（收銀）。
 
 埋了兩個故障：
-  BUG_SILENT_DISCOUNT  故障一：查不到折扣規則時，接住例外回傳 0 折扣（Day 15 由 log 查出）
-  LEAK_KB_PER_REQUEST  故障三：快取只進不出的記憶體洩漏（Day 22 由告警攔下）
+  BUG_SILENT_DISCOUNT  故障一：查不到折扣規則時，接住例外回傳 0 折扣（Day 16 由 log 查出）
+  LEAK_KB_PER_REQUEST  故障三：快取只進不出的記憶體洩漏（Day 24 由告警攔下）
 """
 import os, sys, time, itertools, random
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
