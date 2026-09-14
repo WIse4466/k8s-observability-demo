@@ -1,0 +1,19 @@
+mode: deployment
+# Service 會叫 otel-collector，不會變成 <release>-opentelemetry-collector
+fullnameOverride: otel-collector
+
+image:
+  repository: otel/opentelemetry-collector-k8s
+
+config:
+  exporters:
+    otlp_grpc/tempo:
+      endpoint: tempo.monitoring.svc.cluster.local:4317
+      tls:
+        insecure: true
+  service:
+    pipelines:
+      traces:
+        receivers: [otlp]
+        processors: [memory_limiter, batch]
+        exporters: [otlp_grpc/tempo]
