@@ -6,7 +6,10 @@ import logging, os, sys, time
 import structlog
 from fastapi import Response
 from opentelemetry import trace
-from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
+from prometheus_client import REGISTRY, Counter, Histogram
+# Day 20：exemplar 只有 OpenMetrics 格式才傳得出去，舊的 text 格式會直接丟掉。
+# 注意這個版本的 generate_latest 沒有預設 registry，要自己傳 REGISTRY 進去
+from prometheus_client.openmetrics.exposition import CONTENT_TYPE_LATEST, generate_latest
 
 SERVICE = os.getenv("SERVICE_NAME", "unknown")
 
@@ -65,8 +68,12 @@ def instrument(app, log):
         response = await call_next(request)
         elapsed = time.perf_counter() - start
         path = request.url.path
+        # Day 20：把這筆請求的 trace_id 當 exemplar 夾在 histogram 旁邊，
+        # Grafana 的延遲圖就能從一個點直接跳到那條 trace
+        ctx = trace.get_current_span().get_span_context()
+        exemplar = {"trace_id": format(ctx.trace_id, "032x")} if ctx.is_valid else None
         requests_total.labels(SERVICE, path, str(response.status_code)).inc()
-        request_duration.labels(SERVICE, path).observe(elapsed)
+        request_duration.labels(SERVICE, path).observe(elapsed, exemplar=exemplar)
         log.info("request", path=path, status=response.status_code,
                  duration_ms=round(elapsed * 1000, 1))
         return response
@@ -75,6 +82,6 @@ def instrument(app, log):
     # /metrics/，而 Prometheus 抓的是不帶斜線的路徑。
     @app.get("/metrics")
     def metrics():
-        return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+        return Response(generate_latest(REGISTRY), media_type=CONTENT_TYPE_LATEST)
 
     return app

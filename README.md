@@ -40,13 +40,13 @@ loadgen ──▶ gateway ──▶ catalog ──▶ pricing
 
 ```bash
 # 1. build
-docker build --build-arg SERVICE=pricing -t pricing:0.2 .
-docker build --build-arg SERVICE=catalog -t catalog:0.2 .
-docker build --build-arg SERVICE=gateway -t gateway:0.2 .
+docker build --build-arg SERVICE=pricing -t pricing:0.3 .
+docker build --build-arg SERVICE=catalog -t catalog:0.3 .
+docker build --build-arg SERVICE=gateway -t gateway:0.3 .
 docker build -f Dockerfile.loadgen -t loadgen:0.1 .
 
 # 2. 載進 kind（節點看不到本機的映像檔，少這步會 ErrImagePull）
-kind load docker-image pricing:0.2 catalog:0.2 gateway:0.2 loadgen:0.1 --name obs
+kind load docker-image pricing:0.3 catalog:0.3 gateway:0.3 loadgen:0.1 --name obs
 
 # 3. 部署
 kubectl apply -f k8s/

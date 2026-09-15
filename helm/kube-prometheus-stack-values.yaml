@@ -1,0 +1,70 @@
+# kube-prometheus-stack 的 values（Day 20 補的）
+#
+#   helm upgrade kps prometheus-community/kube-prometheus-stack -n monitoring \
+#     --version 90.0.0 -f helm/kube-prometheus-stack-values.yaml
+#
+# 做五件事：
+#   1. Grafana 和 Prometheus 都開持久化 —— 預設都是 emptyDir，Pod 一重啟，
+#      Grafana 在 UI 做的儀表板和資料源、Prometheus 的指標歷史，全部消失
+#   2. Prometheus 開 exemplar-storage
+#   3. Loki / Tempo 資料源用宣告的，uid 固定叫 loki / tempo，重啟不會掉；
+#      Tempo 的 Trace to logs、Loki 的 trace_id 跳轉也一起寫在這裡，不用進 UI 點
+#   4. Prometheus 資料源的 exemplar 跳轉指到 tempo
+#   5. 關掉 Grafana 13 的 plugin 背景預裝（唯讀檔案系統下會把 plugin 停掉回不來）
+prometheus:
+  prometheusSpec:
+    enableFeatures: [exemplar-storage]
+    # 預設是 emptyDir，Pod 一重啟指標歷史全部歸零。加 PVC 才留得住
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: [ReadWriteOnce]
+          resources:
+            requests:
+              storage: 5Gi
+grafana:
+  persistence:
+    enabled: true
+    size: 2Gi
+  grafana.ini:
+    plugins:
+      # Grafana 13 會在背景把內建的 Prometheus / Loki / Tempo plugin 更新到最新版，
+      # 做法是先停掉再刪目錄重寫——但容器是唯讀根檔案系統，刪不掉，plugin 就被停掉回不來。
+      # 關掉背景預裝，用 image 裡內建的版本就好
+      preinstall_disabled: true
+  sidecar:
+    datasources:
+      exemplarTraceIdDestinations:
+        datasourceUid: tempo
+        traceIdLabelName: trace_id
+        urlDisplayLabel: View trace
+  additionalDataSources:
+    - name: loki
+      uid: loki
+      type: loki
+      access: proxy
+      url: http://loki-gateway.monitoring.svc.cluster.local
+      editable: false
+      jsonData:
+        derivedFields:
+          - name: trace_id
+            datasourceUid: tempo
+            matcherType: label
+            matcherRegex: trace_id
+            url: "$${__value.raw}"
+            urlDisplayLabel: View trace
+    - name: tempo
+      uid: tempo
+      type: tempo
+      access: proxy
+      url: http://tempo.monitoring.svc.cluster.local:3200
+      editable: false
+      jsonData:
+        tracesToLogsV2:
+          datasourceUid: loki
+          spanStartTimeShift: "-5m"
+          spanEndTimeShift: "5m"
+          filterByTraceID: true
+          tags:
+            - key: service.name
+              value: app

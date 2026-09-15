@@ -26,7 +26,7 @@ spec:
     spec:
       containers:
         - name: gateway
-          image: gateway:0.2   # Day 19：加了 OTel 的版本
+          image: gateway:0.3   # Day 20：/metrics 改 OpenMetrics 格式、帶 exemplar
 
           imagePullPolicy: IfNotPresent
 
