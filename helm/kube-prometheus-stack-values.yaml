@@ -11,6 +11,24 @@
 #      Tempo 的 Trace to logs、Loki 的 trace_id 跳轉也一起寫在這裡，不用進 UI 點
 #   4. Prometheus 資料源的 exemplar 跳轉指到 tempo
 #   5. 關掉 Grafana 13 的 plugin 背景預裝（唯讀檔案系統下會把 plugin 停掉回不來）
+#
+# Day 22 又加了兩件：
+#   6. 關掉 kind 上抓不到的控制平面元件，以及節點校時告警 —— 這 14 則誤報從 Day 8 響到現在
+#   7. Alertmanager 的路由：severity=page 與 ticket 分開送，預設 receiver 不再是 null
+
+# --- Day 22：關掉 kind 上一定會誤報的規則 ---------------------------------
+# kind 把 etcd / scheduler / controller-manager / kube-proxy 都綁在 localhost，
+# Prometheus 從外面抓不到，於是它們永遠是 TargetDown + XxxDown。
+# 節點是 Docker 容器，本來就沒跑校時服務，NodeClock 那兩則同理。
+kubeControllerManager: {enabled: false}
+kubeScheduler: {enabled: false}
+kubeProxy: {enabled: false}
+kubeEtcd: {enabled: false}
+defaultRules:
+  disabled:
+    NodeClockNotSynchronising: true
+    NodeClockSkewDetected: true
+
 prometheus:
   prometheusSpec:
     enableFeatures: [exemplar-storage]
@@ -68,3 +86,41 @@ grafana:
           tags:
             - key: service.name
               value: app
+
+# --- Day 22：Alertmanager 的路由 ------------------------------------------
+alertmanager:
+  config:
+    route:
+      # 同一組的告警合併成一則通知。group_by 用 alertname + team，
+      # 不是預設的 namespace——我想要「同一件事、同一個負責人」合在一起
+      group_by: [alertname, team]
+      group_wait: 30s          # 第一則來了先等 30 秒，看有沒有同伴
+      group_interval: 5m       # 同一組有新成員時，最快 5 分鐘再通知一次
+      repeat_interval: 4h      # 沒解決的話每 4 小時再提醒
+      receiver: default        # ⚠️ chart 預設是 null，也就是全部丟掉
+      routes:
+        - matchers: ['alertname = "Watchdog"']
+          receiver: heartbeat
+          repeat_interval: 1h   # 心跳要規律，不然外部檢查不知道多久算太久
+        - matchers: ['severity = "page"']
+          receiver: urgent
+        - matchers: ['severity = "ticket"']
+          receiver: tickets
+          group_wait: 5m        # 工單不急，多等一下多合併一點
+          repeat_interval: 24h
+
+    receivers:
+      - name: default
+        webhook_configs: [{url: 'http://alert-sink.default.svc.cluster.local/alerts'}]
+      - name: urgent
+        webhook_configs: [{url: 'http://alert-sink.default.svc.cluster.local/alerts'}]
+      - name: tickets
+        webhook_configs: [{url: 'http://alert-sink.default.svc.cluster.local/alerts'}]
+      - name: heartbeat
+        webhook_configs: [{url: 'http://alert-sink.default.svc.cluster.local/alerts'}]
+
+    inhibit_rules:
+      # critical 響的時候，同一個 namespace 同一則告警的 warning/info 不用再吵
+      - source_matchers: ['severity = "critical"']
+        target_matchers: ['severity =~ "warning|info"']
+        equal: [namespace, alertname]

@@ -1,0 +1,63 @@
+# ============================================================
+# alert-sink —— 接住 Alertmanager 的 webhook（Day 22）
+#
+# 一個 manifest 檔可以放多個資源，用 --- 分隔。
+# 每個服務都需要兩個：Deployment（生出 Pod）＋ Service（固定的名字）
+# ============================================================
+
+apiVersion: apps/v1          
+kind: Deployment             
+metadata:
+  name: alert-sink              
+  labels:
+    app: alert-sink             
+
+spec:                        
+  replicas: 1                
+
+  selector:
+    matchLabels:
+      app: alert-sink           
+
+  template:                  
+    metadata:
+      labels:
+        app: alert-sink         
+    spec:
+      containers:
+        - name: alert-sink
+          image: alert-sink:0.1   # Day 22：接住 Alertmanager 的 webhook
+
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - name: http     
+              containerPort: 8000
+
+          env:
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://otel-collector.monitoring.svc.cluster.local:4317"
+
+          resources:
+            requests:        
+              memory: 128Mi
+              cpu: 100m      
+            limits:          
+              memory: 512Mi  
+
+---
+apiVersion: v1               # Service
+kind: Service
+metadata:
+  name: alert-sink              
+  labels:
+    app: alert-sink             
+
+spec:
+  selector:
+    app: alert-sink             
+
+  ports:
+    - name: http             
+      port: 80               
+      targetPort: http       

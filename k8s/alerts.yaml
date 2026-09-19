@@ -1,0 +1,45 @@
+# ============================================================
+# 告警規則（Day 22）
+#
+# PrometheusRule 是 Operator 的 CRD，跟 ServiceMonitor 一樣靠 release 標籤被撿走。
+# 漏了 labels.release: kps，Operator 不會載入，而且不會有任何錯誤訊息。
+# ============================================================
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: checkout-slo
+  namespace: monitoring
+  labels:
+    release: kps               # ⚠️ 漏了就靜默失效
+spec:
+  groups:
+    - name: checkout
+      rules:
+        # 故障二：N+1 造成延遲惡化。直接違反 Day 2 定的延遲 SLO，該叫人
+        - alert: CheckoutLatencySLOBreach
+          expr: |
+            sum(rate(http_request_duration_seconds_bucket{job="gateway", path="/checkout", le="0.3"}[5m]))
+              / sum(rate(http_request_duration_seconds_count{job="gateway", path="/checkout"}[5m]))
+              < 0.95
+          for: 10m
+          labels:
+            severity: page
+            team: checkout
+          annotations:
+            summary: "結帳在 300ms 內完成的比例只有 {{ $value | humanizePercentage }}，SLO 是 95%"
+            description: "延遲 SLI 連續 10 分鐘低於 SLO。先看 P50 有沒有跟著動：P50 平、P95 高就是長尾，去 Tempo 找慢的 trace。"
+            runbook_url: "https://github.com/WIse4466/k8s-observability-demo/blob/main/runbooks/checkout-latency.md"
+            dashboard_url: "http://localhost:3000/d/checkout-sli"
+
+        # 故障一：算錯價但回 200。指標全綠，只有這個 counter 看得到。
+        # 影響金額但沒有立即危害，所以是工單不是叫人
+        - alert: DiscountRuleMissing
+          expr: sum(rate(discount_missing_total[5m])) > 0
+          for: 15m
+          labels:
+            severity: ticket
+            team: pricing
+          annotations:
+            summary: "每秒 {{ $value | printf \"%.2f\" }} 筆定價查不到折扣規則，金額算錯但回 200"
+            description: "用 sum by (category) 看是哪些分類缺規則，補上去。使用者不會收到錯誤，所以不用半夜處理。"
+            runbook_url: "https://github.com/WIse4466/k8s-observability-demo/blob/main/runbooks/discount-missing.md"
