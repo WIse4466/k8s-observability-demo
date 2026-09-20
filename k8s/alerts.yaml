@@ -43,3 +43,79 @@ spec:
             summary: "每秒 {{ $value | printf \"%.2f\" }} 筆定價查不到折扣規則，金額算錯但回 200"
             description: "用 sum by (category) 看是哪些分類缺規則，補上去。使用者不會收到錯誤，所以不用半夜處理。"
             runbook_url: "https://github.com/WIse4466/k8s-observability-demo/blob/main/runbooks/discount-missing.md"
+
+    # ------------------------------------------------------------------
+    # Day 23：從 SLO 反推的 burn rate 告警
+    #
+    # 延遲 SLO 是 95%，錯誤預算 5%。burn rate = 實際壞掉的比例 ÷ 5%。
+    # 門檻照 Google SRE Workbook 的 multi-window multi-burn-rate：
+    #   1h / 5m   × 14.4  → 2 小時燒掉 2% 預算，page
+    #   6h / 30m  × 6     → 6 小時燒掉 5% 預算，page
+    #   3d / 6h   × 1     → 3 天燒掉 10% 預算，ticket
+    # 長視窗判斷嚴重性，短視窗確認現在還在燒（問題修好告警就解除）
+    # ------------------------------------------------------------------
+    - name: checkout-burn-rate
+      rules:
+        - alert: CheckoutLatencyBudgetBurnFast
+          expr: |
+            (1 - (
+              sum(rate(http_request_duration_seconds_bucket{job="gateway",path="/checkout",le="0.3"}[1h]))
+              / sum(rate(http_request_duration_seconds_count{job="gateway",path="/checkout"}[1h]))
+            )) / 0.05 > 14.4
+            and
+            (1 - (
+              sum(rate(http_request_duration_seconds_bucket{job="gateway",path="/checkout",le="0.3"}[5m]))
+              / sum(rate(http_request_duration_seconds_count{job="gateway",path="/checkout"}[5m]))
+            )) / 0.05 > 14.4
+          for: 2m
+          labels:
+            severity: page
+            team: checkout
+          annotations:
+            summary: "延遲錯誤預算以 {{ $value | printf \"%.1f\" }} 倍速燃燒，約 50 小時用完本月預算"
+            description: "看儀表板的 P95，再用 exemplar 跳到慢的 trace。修好之後 5 分鐘內告警會自己解除。"
+            runbook_url: "https://github.com/WIse4466/k8s-observability-demo/blob/main/runbooks/checkout-latency.md"
+
+        - alert: CheckoutLatencyBudgetBurnSlow
+          expr: |
+            (1 - (
+              sum(rate(http_request_duration_seconds_bucket{job="gateway",path="/checkout",le="0.3"}[3d]))
+              / sum(rate(http_request_duration_seconds_count{job="gateway",path="/checkout"}[3d]))
+            )) / 0.05 > 1
+            and
+            (1 - (
+              sum(rate(http_request_duration_seconds_bucket{job="gateway",path="/checkout",le="0.3"}[6h]))
+              / sum(rate(http_request_duration_seconds_count{job="gateway",path="/checkout"}[6h]))
+            )) / 0.05 > 1
+          for: 30m
+          labels:
+            severity: ticket
+            team: checkout
+          annotations:
+            summary: "延遲錯誤預算以 {{ $value | printf \"%.1f\" }} 倍速燃燒，本月預算會提早用完"
+            description: "慢性失血，不急著半夜處理，但這個月結束前一定要修。"
+            runbook_url: "https://github.com/WIse4466/k8s-observability-demo/blob/main/runbooks/checkout-latency.md"
+
+    # ------------------------------------------------------------------
+    # Day 23：故障三的預測式告警
+    #
+    # 記憶體洩漏現在沒有症狀，但它一定會 OOM。用 predict_linear 看趨勢，
+    # 不用固定門檻——固定門檻會被重啟洗掉，隔天再犯。
+    # 注意記憶體上限要用 kube-state-metrics 的指標，
+    # kind 上 container_spec_memory_limit_bytes 是空的。
+    # ------------------------------------------------------------------
+    - name: memory-trend
+      rules:
+        - alert: PodMemoryWillExhaustLimit
+          expr: |
+            predict_linear(container_memory_working_set_bytes{namespace="default"}[1h], 4 * 3600)
+              > on(namespace, pod, container)
+            kube_pod_container_resource_limits{namespace="default", resource="memory"}
+          for: 15m
+          labels:
+            severity: ticket
+            team: platform
+          annotations:
+            summary: "{{ $labels.container }} 照目前趨勢，4 小時內會撞到記憶體上限"
+            description: "看 container_memory_working_set_bytes 的斜率是不是一直往上不回頭。是的話就是洩漏，重啟只能拖時間。"
+            runbook_url: "https://github.com/WIse4466/k8s-observability-demo/blob/main/runbooks/memory-leak.md"
