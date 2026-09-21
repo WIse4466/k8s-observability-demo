@@ -107,10 +107,17 @@ spec:
     - name: memory-trend
       rules:
         - alert: PodMemoryWillExhaustLimit
+          # ⚠️ 兩邊都要先用 max by 收斂。容器重啟之後 cAdvisor 會對同一個
+          # (namespace, pod, container) 留下兩條序列（死掉的和新的，靠 id / name 區分），
+          # 不收斂的話 on(...) 會變成多對一，規則報 many-to-one 但畫面上看不出來
           expr: |
-            predict_linear(container_memory_working_set_bytes{namespace="default"}[1h], 4 * 3600)
+            max by (namespace, pod, container) (
+              predict_linear(container_memory_working_set_bytes{namespace="default", container!=""}[1h], 4 * 3600)
+            )
               > on(namespace, pod, container)
-            kube_pod_container_resource_limits{namespace="default", resource="memory"}
+            max by (namespace, pod, container) (
+              kube_pod_container_resource_limits{namespace="default", resource="memory"}
+            )
           for: 15m
           labels:
             severity: ticket
