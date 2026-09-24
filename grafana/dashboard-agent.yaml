@@ -1,0 +1,194 @@
+# Day 26：agent 自己的儀表板。單價是 gemini-3.1-flash-lite 的付費價
+# （輸入 0.25 / 輸出 1.50 美元每百萬 token，2026-09 查），換模型要改。
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-agent
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  agent.json: |-
+    {
+      "uid": "agent-observability",
+      "title": "Agent 自己的觀測",
+      "tags": [
+        "day26"
+      ],
+      "timezone": "browser",
+      "schemaVersion": 39,
+      "version": 1,
+      "editable": true,
+      "refresh": "30s",
+      "time": {
+        "from": "now-3h",
+        "to": "now"
+      },
+      "panels": [
+        {
+          "id": 1,
+          "type": "timeseries",
+          "title": "過去一小時的花費（美元）",
+          "gridPos": {
+            "h": 9,
+            "w": 12,
+            "x": 0,
+            "y": 0
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "currencyUSD",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 10
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(increase(gen_ai_client_inference_usage_input_tokens_total[1h])) * 0.25 / 1e6\n  + sum(increase(gen_ai_client_inference_usage_output_tokens_total[1h])) * 1.50 / 1e6",
+              "legendFormat": "USD",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              }
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "type": "timeseries",
+          "title": "模型呼叫 P95 延遲",
+          "gridPos": {
+            "h": 9,
+            "w": 12,
+            "x": 12,
+            "y": 0
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 10
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "histogram_quantile(0.95, sum by (le, gen_ai_request_model) (rate(gen_ai_client_operation_duration_seconds_bucket[5m])))",
+              "legendFormat": "{{gen_ai_request_model}}",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              }
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "type": "timeseries",
+          "title": "token 用量（每秒）",
+          "gridPos": {
+            "h": 9,
+            "w": 12,
+            "x": 0,
+            "y": 9
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 10
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(rate(gen_ai_client_inference_usage_input_tokens_total[5m]))",
+              "legendFormat": "輸入",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              }
+            },
+            {
+              "refId": "B",
+              "expr": "sum(rate(gen_ai_client_inference_usage_output_tokens_total[5m]))",
+              "legendFormat": "輸出",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              }
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "type": "timeseries",
+          "title": "每次執行呼叫幾次模型",
+          "gridPos": {
+            "h": 9,
+            "w": 12,
+            "x": 12,
+            "y": 9
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 10
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(rate(gen_ai_client_operation_duration_seconds_count[5m]))",
+              "legendFormat": "呼叫數/秒",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              }
+            }
+          ]
+        }
+      ]
+    }

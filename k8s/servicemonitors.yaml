@@ -41,4 +41,21 @@ spec:
   endpoints:
     - port: http
       path: /metrics
+      interval: 15s---
+# Collector 自己不在 default namespace，所以要指定去哪裡找（Day 26）
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: otel-collector
+  namespace: monitoring
+  labels:
+    release: kps
+spec:
+  namespaceSelector:
+    matchNames: [monitoring]
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: opentelemetry-collector
+  endpoints:
+    - port: prometheus
       interval: 15s

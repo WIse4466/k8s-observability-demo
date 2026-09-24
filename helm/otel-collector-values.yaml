@@ -3,17 +3,47 @@ mode: deployment
 fullnameOverride: otel-collector
 
 image:
-  repository: otel/opentelemetry-collector-k8s
+  # 不能用 otel/opentelemetry-collector-k8s——那個精簡版沒有 prometheus exporter，
+  # 啟動會直接報 'exporters' unknown type: "prometheus"
+  repository: otel/opentelemetry-collector-contrib
+
+ports:
+  # chart 預設沒開這個埠。Collector 把自己收到的指標換成 Prometheus 格式吐在這裡，
+  # 再讓 Prometheus 來抓（見 k8s/servicemonitors.yaml 裡的 otel-collector）
+  prometheus:
+    enabled: true
+    containerPort: 8889
+    servicePort: 8889
+    protocol: TCP
 
 config:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          # chart 預設綁 ${env:MY_POD_IP}，那樣 kubectl port-forward 打不進來
+          # （port-forward 是從 Pod 內部連 localhost）。叢集外的 agent 要送資料就得改這行。
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
   exporters:
     otlp_grpc/tempo:
       endpoint: tempo.monitoring.svc.cluster.local:4317
       tls:
         insecure: true
+    prometheus:
+      endpoint: 0.0.0.0:8889
+      # 指標名稱裡的點會被換成底線，gen_ai.client... 會變成 gen_ai_client...
+      resource_to_telemetry_conversion:
+        enabled: true
   service:
     pipelines:
       traces:
         receivers: [otlp]
         processors: [memory_limiter, batch]
         exporters: [otlp_grpc/tempo]
+      metrics:
+        # chart 預設只接到 debug exporter，等於收了就丟掉
+        receivers: [otlp]
+        processors: [memory_limiter, batch]
+        exporters: [prometheus]
