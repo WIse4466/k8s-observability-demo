@@ -184,6 +184,8 @@ data:
 kind: ConfigMap
 metadata:
   labels:
-    grafana_dashboard: "1"   # kube-prometheus-stack 的 sidecar 靠這個標籤找儀表板
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "可觀測性"   # kube-prometheus-stack 的 sidecar 靠這個標籤找儀表板
   name: grafana-dashboard-checkout-sli
   namespace: monitoring

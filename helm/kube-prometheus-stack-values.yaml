@@ -51,6 +51,12 @@ grafana:
       # 關掉背景預裝，用 image 裡內建的版本就好
       preinstall_disabled: true
   sidecar:
+    dashboards:
+      # 讓 sidecar 依照 ConfigMap 上的 grafana_folder 註記決定放哪個資料夾。
+      # 預設是全部丟進 General，28 張圖混在一起找不到自己的（Day 28）
+      folderAnnotation: grafana_folder
+      provider:
+        foldersFromFilesStructure: true
     datasources:
       exemplarTraceIdDestinations:
         datasourceUid: tempo

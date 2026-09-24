@@ -1,0 +1,6 @@
+# state 檔會記下所有被管理資源的實際內容，可能包含密碼，絕對不要進 git
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# .terraform.lock.hcl 要進 git：它記下實際解析到的 provider 版本與雜湊值
