@@ -1,0 +1,9 @@
+# Day 5 的叢集定義。原本放在 repo 外面，Day 30 重建前才發現
+# clone 這個 repo 的人拿不到它——第一步就卡住。
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: obs
+nodes:
+  - role: control-plane
+  - role: worker
+  - role: worker
