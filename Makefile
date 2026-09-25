@@ -28,8 +28,11 @@ load:
 	kind load docker-image pricing:$(TAG) catalog:$(TAG) gateway:$(TAG) \
 	  alert-sink:0.1 loadgen:0.1 --name $(CLUSTER)
 
+## 全新叢集上不能直接 diff：helm-diff 要把 chart 渲染後對照叢集的 API，
+## 但 Alertmanager / ServiceMonitor 這些 CRD 這時還不存在，渲染就先失敗。
+## --skip-diff-on-install 讓「第一次安裝」的 release 跳過 diff，直接裝。
 charts:
-	helmfile apply
+	helmfile apply --skip-diff-on-install
 
 ## ServiceMonitor 需要 Operator 的 CRD，所以一定要在 charts 之後
 services:
