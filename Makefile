@@ -1,4 +1,4 @@
-# 一鍵重建（Day 30）。kind-config.yaml 在上一層，所以有 ROOT。
+# 一鍵重建（Day 30）。
 # 叢集定義就在這個 repo 裡（Day 30 之前它在外面，別人 clone 下來第一步就做不了）
 CLUSTER := obs
 TAG := 0.3
