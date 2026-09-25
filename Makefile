@@ -50,4 +50,5 @@ verify:
 	@echo "--- 監控元件 ---";    kubectl -n monitoring get pods --no-headers | grep -c Running | xargs echo "  Running:"
 	@echo "--- 示範服務 ---";    kubectl get pods --no-headers | grep -c Running | xargs echo "  Running:"
 	@echo "--- 自訂指標 ---";    curl -s --get localhost:9090/api/v1/query --data-urlencode 'query=checkout_total' | python3 -c "import json,sys;print('  checkout_total 序列數:',len(json.load(sys.stdin)['data']['result']))"
-	@echo "--- 告警規則 ---";    curl -s localhost:9090/api/v1/rules | python3 -c "import json,sys;print('  規則數:',sum(len(g['rules']) for g in json.load(sys.stdin)['data']['groups']))"
+	@echo "--- 告警規則 ---";    curl -s localhost:9090/api/v1/rules | python3 -c "import json,sys;gs=json.load(sys.stdin)['data']['groups'];mine=[r for g in gs if g['name'] in ('checkout','checkout-burn-rate','memory-trend') for r in g['rules']];print('  我寫的規則:',len(mine),'/ 全部:',sum(len(g['rules']) for g in gs))"
+	@echo "--- exemplar ---";     curl -s --get localhost:9090/api/v1/query_exemplars --data-urlencode 'query=http_request_duration_seconds_bucket{job="gateway"}' --data-urlencode "start=$$(( $$(date +%s)-600 ))" --data-urlencode "end=$$(date +%s)" | python3 -c "import json,sys;print('  exemplar 數:',sum(len(x.get('exemplars',[])) for x in json.load(sys.stdin).get('data',[])))"
