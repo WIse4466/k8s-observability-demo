@@ -1,0 +1,6 @@
+# Day 29：Tempo 原本是全預設裝的，helm get values 回 null。
+# 「全預設」不等於「沒有設定」——預設值會隨 chart 版本改變，
+# 而且這個 chart 的預設是不開持久化，trace 寫在 Pod 上，重啟就沒了。
+persistence:
+  enabled: true
+  size: 5Gi

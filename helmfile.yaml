@@ -1,0 +1,62 @@
+# 前面二十八天分五次、跨十二天裝出來的東西，收成這一個檔案。
+#
+# 用法：
+#   helmfile deps    拉 chart repo
+#   helmfile diff    看「如果執行會改什麼」——相當於 tofu plan
+#   helmfile apply   執行
+#
+# 版本全部釘死。不釘的話同一份檔案今天和三個月後會裝出不同的東西，
+# 「可重現」就是假的。chart 版本與軟體版本是兩個數字，這裡釘的是前者，
+# 因為 chart 裡面寫死了它要用哪個映像檔標籤。
+
+repositories:
+  - name: prometheus-community
+    url: https://prometheus-community.github.io/helm-charts
+  - name: grafana
+    url: https://grafana.github.io/helm-charts
+  - name: open-telemetry
+    url: https://open-telemetry.github.io/opentelemetry-helm-charts
+
+releases:
+  # Prometheus + Grafana + Alertmanager + Operator（含 ServiceMonitor 的 CRD）
+  - name: kps
+    namespace: monitoring
+    createNamespace: true
+    chart: prometheus-community/kube-prometheus-stack
+    version: 90.0.0
+    values:
+      - helm/kube-prometheus-stack-values.yaml
+
+  - name: loki
+    namespace: monitoring
+    chart: grafana/loki
+    version: 7.3.0
+    values:
+      - helm/loki-values.yaml
+
+  - name: tempo
+    namespace: monitoring
+    chart: grafana/tempo
+    version: 1.24.4
+    values:
+      - helm/tempo-values.yaml
+
+  # Collector 把 trace 送給 Tempo，所以 Tempo 要先在
+  - name: otel-collector
+    namespace: monitoring
+    chart: open-telemetry/opentelemetry-collector
+    version: 0.173.1
+    values:
+      - helm/otel-collector-values.yaml
+    needs:
+      - monitoring/tempo
+
+  # Alloy 把 log 送給 Loki，所以 Loki 要先在
+  - name: alloy
+    namespace: monitoring
+    chart: grafana/alloy
+    version: 1.12.1
+    values:
+      - helm/alloy-values.yaml
+    needs:
+      - monitoring/loki
